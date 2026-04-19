@@ -1,26 +1,32 @@
 class MacosMcp < Formula
-  desc "MCP server exposing native macOS capabilities (Spotlight, Shortcuts, Calendar, Reminders, screencapture, Vision OCR, browser tabs, Mail) to LLM agents"
+  desc "Expose native macOS capabilities to LLM agents over MCP stdio"
   homepage "https://github.com/BetterThanAny/macos-mcp"
   url "https://github.com/BetterThanAny/macos-mcp/releases/download/v0.1.0/macos-mcp-v0.1.0-darwin-arm64.tar.gz"
-  sha256 "aa6e6f0809d1a1acea87f181fbe52d84679848cc1cfed5a6219ba57e96602d74"
   version "0.1.0"
+  sha256 "aa6e6f0809d1a1acea87f181fbe52d84679848cc1cfed5a6219ba57e96602d74"
   license "MIT"
 
-  depends_on :macos
   depends_on arch: :arm64
+  depends_on :macos
 
   def install
     bin.install "macos-mcp"
   end
 
   test do
-    # The server speaks MCP JSON-RPC over stdio. Send a minimal initialize
-    # request and assert the response looks like a JSON-RPC reply.
-    init_request = <<~JSON.chomp
+    require "open3"
+    init = <<~JSON.chomp + "\n"
       {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"brew-test","version":"1"}}}
     JSON
-    response = pipe_output("#{bin}/macos-mcp", init_request, 0)
-    assert_match(/"jsonrpc"\s*:\s*"2\.0"/, response)
-    assert_match(/"serverInfo"/, response)
+
+    response = nil
+    Open3.popen3(bin/"macos-mcp") do |stdin, stdout, _stderr, wait_thr|
+      stdin.write(init)
+      stdin.close_write
+      response = stdout.read
+      wait_thr.join(5) || Process.kill("TERM", wait_thr.pid)
+    end
+    assert_match(/"jsonrpc"\s*:\s*"2\.0"/, response.to_s)
+    assert_match(/"serverInfo"/, response.to_s)
   end
 end
