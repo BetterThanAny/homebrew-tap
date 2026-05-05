@@ -1,0 +1,28 @@
+name: Test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  formula:
+    runs-on: macos-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate Ruby syntax
+        run: ruby -c Formula/macos-mcp.rb
+
+      - name: Tap local checkout
+        run: brew tap local/homebrew-tap "$GITHUB_WORKSPACE"
+
+      - name: Audit formula
+        run: brew audit --formula --strict --tap local/homebrew-tap
+
+      - name: Install formula
+        run: brew install local/homebrew-tap/macos-mcp
+
+      - name: Test formula
+        run: brew test local/homebrew-tap/macos-mcp
